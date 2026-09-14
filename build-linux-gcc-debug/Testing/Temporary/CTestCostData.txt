@@ -1,0 +1,14 @@
+primitive 2 0.00336942
+graph 2 0.00308443
+topology 2 0.00311461
+determinism 2 0.00406815
+expressivity 2 0.00323427
+expressivity_regression 2 0.00339915
+fsm 2 0.00297382
+generated 2 0.00948498
+serialization 2 0.00293095
+analysis 2 0.00330097
+retry 2 0.00425456
+freeze 2 0.0179608
+cross_toolchain 1 0.00624321
+---

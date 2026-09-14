@@ -1,0 +1,17 @@
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/pnp.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_primitive.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_graph.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_topology.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_determinism.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_expressivity.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_expressivity_regression.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_fsm.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_generated.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_serialization.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_analysis.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_retry.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test_freeze.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/pnp_benchmark.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/test.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/edit_cache.dir
+C:/Users/vande/Desktop/NETWORK/build-analyzer/CMakeFiles/rebuild_cache.dir

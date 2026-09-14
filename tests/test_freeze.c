@@ -1,0 +1,65 @@
+#include <limits.h>
+#include "test_support.h"
+#include "pnp_serialize.h"
+#include "../src/pnp_internal.h"
+
+static uint32_t bits(uint32_t v){uint32_t n=0u;while(v!=0u){n+=v&1u;v>>=1u;}return n;}
+static pnp_word_t execute_result(pnp_config_t c,pnp_state_t s,pnp_event_t e){pnp_state_t next;pnp_output_buffer_t o;c.emit_true=1u;c.event_update_destination=(uint8_t)PNP_EVENT_DEST_METADATA;c.event_update_source=(uint8_t)PNP_EVENT_VALUE_RESULT;c.event_update_index=0u;if(pnp_execute(&c,&s,&e,&next,&o)!=PNP_OK||o.count!=1u)return UINT64_C(0xdeadbeef);return o.items[0].event.fields[0];}
+
+static int exhaustive_sources(void){
+    pnp_state_t s={{0}};pnp_event_t e={0};pnp_config_t c=pass_config(1u);const pnp_word_t expected[]={0u,1u,33u,44u,55u,66u,77u,88u,99u,111u};
+    s.words[PNP_STATE_WORD_COUNT-1u]=55u;e.type=66u;e.sequence=77u;e.epoch=88u;e.flags=99u;e.input_port=111u;e.fields[PNP_EVENT_FIELD_COUNT-1u]=44u;
+    for(uint8_t kind=0u;kind<(uint8_t)PNP_SRC_COUNT;++kind){c.source_a.kind=kind;c.source_a.index=0u;c.source_a.immediate=33u;if(kind==(uint8_t)PNP_SRC_EVENT_FIELD)c.source_a.index=(uint8_t)(PNP_EVENT_FIELD_COUNT-1u);if(kind==(uint8_t)PNP_SRC_STATE_WORD)c.source_a.index=(uint8_t)(PNP_STATE_WORD_COUNT-1u);CHECK(execute_result(c,s,e)==expected[kind]);}
+    return 0;
+}
+
+static int exhaustive_alu_and_predicates(void){
+    const pnp_word_t values[]={0u,1u,2u,UINT64_MAX,UINT64_MAX-1u,UINT64_C(0x8000000000000000),UINT64_C(0x7fffffffffffffff),UINT64_C(0xaaaaaaaaaaaaaaaa),UINT64_C(0x5555555555555555)};
+    pnp_state_t s={{0}};pnp_event_t e={0};pnp_config_t c=pass_config(1u);c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_b.kind=(uint8_t)PNP_SRC_CONSTANT;
+    for(uint8_t op=0u;op<(uint8_t)PNP_ALU_COUNT;++op)for(uint32_t i=0u;i<9u;++i){c.alu_op=op;c.source_a.immediate=values[i];c.source_b.immediate=(op==(uint8_t)PNP_ALU_SHL||op==(uint8_t)PNP_ALU_SHR)?(i%3u==0u?0u:i%3u==1u?1u:63u):values[8u-i];CHECK(pnp_validate_config(&c)==PNP_OK);(void)execute_result(c,s,e);}
+    c.alu_op=(uint8_t)PNP_ALU_ADD;c.source_a.immediate=UINT64_MAX;c.source_b.immediate=1u;CHECK(execute_result(c,s,e)==0u);c.alu_op=(uint8_t)PNP_ALU_SUB;c.source_a.immediate=0u;CHECK(execute_result(c,s,e)==UINT64_MAX);
+    c.alu_op=(uint8_t)PNP_ALU_SHL;c.source_a.immediate=1u;for(uint64_t sh=0u;sh<=63u;sh=sh==1u?63u:sh+1u){c.source_b.immediate=sh;CHECK(execute_result(c,s,e)==(UINT64_C(1)<<sh));if(sh==63u)break;}
+    c.source_b.kind=(uint8_t)PNP_SRC_EVENT_FIELD;c.source_b.index=1u;e.fields[1]=64u;CHECK(execute_result(c,s,e)==1u);e.fields[1]=65u;CHECK(execute_result(c,s,e)==2u);c.alu_op=(uint8_t)PNP_ALU_SHR;c.source_a.immediate=UINT64_C(0x8000000000000000);e.fields[1]=63u;CHECK(execute_result(c,s,e)==1u);
+    for(uint8_t pred=0u;pred<(uint8_t)PNP_PRED_COUNT;++pred)for(uint8_t inv=0u;inv<2u;++inv){pnp_state_t next;pnp_output_buffer_t o;c=pass_config(1u);c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_a.immediate=1u;c.predicate=pred;c.predicate_invert=inv;c.compare_source.kind=(uint8_t)PNP_SRC_CONSTANT;c.compare_source.immediate=1u;c.predicate_bit=pred==(uint8_t)PNP_PRED_BIT_SET?0u:0u;CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK);}
+    c=pass_config(1u);c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_a.immediate=UINT64_C(1)<<63u;c.predicate=(uint8_t)PNP_PRED_BIT_SET;c.predicate_bit=63u;{pnp_state_t next;pnp_output_buffer_t o;CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK&&o.count==1u);}return 0;
+}
+
+static int exhaustive_updates_and_masks(void){
+    pnp_state_t s={{0}},next;pnp_event_t e={0};pnp_output_buffer_t o;pnp_config_t c;e.fields[0]=123u;s.words[0]=9u;
+    for(uint8_t mode=0u;mode<(uint8_t)PNP_UPDATE_COUNT;++mode){c=pass_config(0u);c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_a.immediate=10u;c.source_b.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_b.immediate=2u;c.alu_op=(uint8_t)PNP_ALU_ADD;c.update_mode=mode;c.update_index=mode==(uint8_t)PNP_UPDATE_NONE?0u:(uint8_t)(PNP_STATE_WORD_COUNT-1u);if(mode==(uint8_t)PNP_UPDATE_EVENT_FIELD)c.update_event_index=0u;c.update_constant=77u;CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK);}
+    for(uint32_t mask=0u;mask<(UINT32_C(1)<<PNP_MAX_OUTPUTS);++mask){c=pass_config(mask);CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK);CHECK(o.count==bits(mask));for(uint32_t i=1u;i<o.count;++i)CHECK(o.items[i-1u].port<o.items[i].port);}
+    return 0;
+}
+
+static int exhaustive_event_updates(void){
+    pnp_state_t s={{0}},next;s.words[PNP_STATE_WORD_COUNT-1u]=71u;pnp_event_t e={0},before;pnp_output_buffer_t o;pnp_config_t c;
+    e.type=1u;e.flags=2u;e.sequence=3u;e.epoch=4u;e.fields[0]=5u;e.fields[PNP_EVENT_FIELD_COUNT-1u]=6u;before=e;
+    for(uint8_t dest=0u;dest<(uint8_t)PNP_EVENT_DEST_COUNT;++dest)for(uint8_t source=0u;source<(uint8_t)PNP_EVENT_VALUE_COUNT;++source){c=pass_config(3u);c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_a.immediate=41u;c.source_b.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_b.immediate=43u;c.alu_op=(uint8_t)PNP_ALU_ADD;c.event_update_destination=dest;c.event_update_source=source;c.event_update_constant=73u;if(dest==(uint8_t)PNP_EVENT_DEST_METADATA)c.event_update_index=(uint8_t)(PNP_EVENT_FIELD_COUNT-1u);if(source==(uint8_t)PNP_EVENT_VALUE_STATE_WORD)c.event_update_state_index=(uint8_t)(PNP_STATE_WORD_COUNT-1u);if(dest==(uint8_t)PNP_EVENT_DEST_NONE){c.event_update_source=(uint8_t)PNP_EVENT_VALUE_RESULT;c.event_update_state_index=0u;}CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK);CHECK(memcmp(&e,&before,sizeof(e))==0);CHECK(o.count==2u&&memcmp(&o.items[0].event,&o.items[1].event,sizeof(e))==0);}
+    c=pass_config(1u);c.event_update_destination=(uint8_t)PNP_EVENT_DEST_METADATA;c.event_update_source=(uint8_t)PNP_EVENT_VALUE_CONSTANT;c.event_update_constant=9u;c.event_update_index=0u;CHECK(pnp_execute(&c,&s,&e,&next,&o)==PNP_OK&&o.items[0].event.fields[0]==9u);return 0;
+}
+
+static int validation_torture(void){
+    pnp_config_t c,before; pnp_state_t s={{0}},out;pnp_event_t e={0};pnp_output_buffer_t o;
+#define BAD(field,value) do{c=pass_config(0u);c.field=(value);before=c;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);CHECK(memcmp(&c,&before,sizeof(c))==0);}while(0)
+    BAD(source_a.kind,UINT8_MAX);BAD(source_b.kind,(uint8_t)PNP_SRC_COUNT);BAD(compare_source.kind,(uint8_t)PNP_SRC_COUNT);BAD(alu_op,(uint8_t)PNP_ALU_COUNT);BAD(predicate,(uint8_t)PNP_PRED_COUNT);BAD(update_mode,(uint8_t)PNP_UPDATE_COUNT);BAD(event_update_destination,(uint8_t)PNP_EVENT_DEST_COUNT);BAD(event_update_source,(uint8_t)PNP_EVENT_VALUE_COUNT);BAD(reserved,1u);
+    c=pass_config(0u);c.source_a.reserved=1u;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);c=pass_config(0u);c.source_a.kind=(uint8_t)PNP_SRC_EVENT_FIELD;c.source_a.index=(uint8_t)PNP_EVENT_FIELD_COUNT;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);c=pass_config(0u);c.source_a.kind=(uint8_t)PNP_SRC_STATE_WORD;c.source_a.index=(uint8_t)PNP_STATE_WORD_COUNT;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);
+    c=pass_config(0u);c.update_mode=(uint8_t)PNP_UPDATE_RESULT;c.update_index=(uint8_t)PNP_STATE_WORD_COUNT;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);c=pass_config(0u);c.event_update_destination=(uint8_t)PNP_EVENT_DEST_METADATA;c.event_update_index=(uint8_t)PNP_EVENT_FIELD_COUNT;CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);c=pass_config(UINT32_C(1)<<PNP_MAX_OUTPUTS);CHECK(pnp_validate_config(&c)==PNP_ERR_INVALID_CONFIG);
+    CHECK(pnp_execute(NULL,&s,&e,&out,&o)==PNP_ERR_INVALID_ARGUMENT);CHECK(pnp_execute(&c,NULL,&e,&out,&o)==PNP_ERR_INVALID_ARGUMENT);CHECK(pnp_execute(&c,&s,NULL,&out,&o)==PNP_ERR_INVALID_ARGUMENT);CHECK(pnp_execute(&c,&s,&e,NULL,&o)==PNP_ERR_INVALID_ARGUMENT);CHECK(pnp_execute(&c,&s,&e,&out,NULL)==PNP_ERR_INVALID_ARGUMENT);
+#undef BAD
+    return 0;
+}
+
+static int d1_and_differential(void){
+    pnp_config_t c=pass_config(0xffu);pnp_state_t s={{0}},a,b,ref;pnp_event_t e={0};pnp_output_buffer_t oa,ob,oref;c.source_a.kind=(uint8_t)PNP_SRC_CONSTANT;c.source_a.immediate=UINT64_MAX;c.source_b.kind=(uint8_t)PNP_SRC_ONE;c.alu_op=(uint8_t)PNP_ALU_ADD;c.update_mode=(uint8_t)PNP_UPDATE_RESULT;c.update_index=(uint8_t)(PNP_STATE_WORD_COUNT-1u);c.event_update_destination=(uint8_t)PNP_EVENT_DEST_FLAGS;c.event_update_source=(uint8_t)PNP_EVENT_VALUE_RESULT;CHECK(pnp_execute(&c,&s,&e,&ref,&oref)==PNP_OK);
+    for(uint32_t i=0u;i<100000u;++i){CHECK(pnp_execute(&c,&s,&e,&a,&oa)==PNP_OK);CHECK(pnp_execute_valid(&c,&s,&e,&b,&ob)==PNP_OK);CHECK(memcmp(&a,&ref,sizeof(a))==0&&memcmp(&oa,&oref,sizeof(oa))==0);CHECK(memcmp(&a,&b,sizeof(a))==0&&memcmp(&oa,&ob,sizeof(oa))==0);}return 0;
+}
+
+static int queue_stress(void){pnp_graph_event_t storage[7],in={0},out;pnp_queue_t q;pnp_queue_init(&q,storage,1u);CHECK(pnp_queue_push(&q,&in)==PNP_OK&&pnp_queue_push(&q,&in)==PNP_ERR_QUEUE_FULL);CHECK(pnp_queue_pop(&q,&out)==PNP_OK&&pnp_queue_pop(&q,&out)==PNP_ERR_QUEUE_EMPTY);pnp_queue_init(&q,storage,7u);for(uint32_t i=0u;i<10000u;++i){in.node_id=i;CHECK(pnp_queue_push(&q,&in)==PNP_OK);CHECK(pnp_queue_pop(&q,&out)==PNP_OK&&out.node_id==i);}for(uint32_t i=0u;i<7u;++i){CHECK(pnp_queue_push(&q,&in)==PNP_OK);}CHECK(pnp_queue_full(&q)&&pnp_queue_push(&q,&in)==PNP_ERR_QUEUE_FULL);for(uint32_t i=0u;i<7u;++i){CHECK(pnp_queue_pop(&q,&out)==PNP_OK);}q.head=q.capacity;CHECK(pnp_queue_push(&q,&in)==PNP_ERR_INVALID_ARGUMENT);q.head=0u;q.count=q.capacity+1u;CHECK(pnp_queue_pop(&q,&out)==PNP_ERR_INVALID_ARGUMENT);return 0;}
+
+static int chain(uint32_t count){pnp_node_t nodes[64];pnp_state_domain_t domains[64];pnp_edge_t edges[64];pnp_graph_event_t store[4];pnp_queue_t q;pnp_graph_output_t item;pnp_graph_output_buffer_t outputs={&item,1u,0u};pnp_run_stats_t stats;pnp_event_t event={0};pnp_graph_t g={nodes,count,64u,edges,count,64u,domains,count,64u};memset(nodes,0,sizeof(nodes));memset(domains,0,sizeof(domains));for(uint32_t i=0u;i<count;++i){nodes[i].config=pass_config(1u);nodes[i].state_domain=i;edges[i]=(pnp_edge_t){i,0u,i+1u<count?i+1u:PNP_EXTERNAL_NODE,0u};}pnp_queue_init(&q,store,4u);CHECK(pnp_graph_inject(&q,0u,0u,&event)==PNP_OK);CHECK(pnp_graph_run(&g,&q,&outputs,(pnp_run_limits_t){count,count},&stats)==PNP_OK&&stats.steps==count&&outputs.count==1u);return 0;}
+
+static int topology_and_budgets(void){CHECK(chain(1u)==0&&chain(2u)==0&&chain(4u)==0&&chain(16u)==0&&chain(64u)==0);pnp_node_t n[2];pnp_state_domain_t d[2];pnp_edge_t e[3];pnp_graph_event_t store[4];pnp_queue_t q;pnp_graph_output_t items[2];pnp_graph_output_buffer_t out={items,2u,0u};pnp_run_stats_t stats;pnp_event_t input={0};pnp_graph_t g={n,2u,2u,e,3u,3u,d,2u,2u};memset(n,0,sizeof(n));memset(d,0,sizeof(d));n[0].config=pass_config(1u);n[1].config=pass_config(1u);n[1].state_domain=1u;e[0]=(pnp_edge_t){0u,0u,1u,0u};e[1]=(pnp_edge_t){0u,0u,1u,0u};e[2]=(pnp_edge_t){1u,0u,PNP_EXTERNAL_NODE,0u};pnp_queue_init(&q,store,1u);CHECK(pnp_graph_inject(&q,0u,0u,&input)==PNP_OK);CHECK(pnp_graph_run(&g,&q,&out,(pnp_run_limits_t){9u,9u},&stats)==PNP_ERR_QUEUE_FULL);pnp_queue_init(&q,store,4u);CHECK(pnp_graph_inject(&q,0u,0u,&input)==PNP_OK);CHECK(pnp_graph_run(&g,&q,&out,(pnp_run_limits_t){1u,9u},&stats)==PNP_ERR_STEP_LIMIT);pnp_queue_init(&q,store,4u);CHECK(pnp_graph_inject(&q,0u,0u,&input)==PNP_OK);CHECK(pnp_graph_run(&g,&q,&out,(pnp_run_limits_t){9u,1u},&stats)==PNP_ERR_EMIT_LIMIT);return 0;}
+
+static int serialization_torture(void){pnp_config_t c=pass_config(0xffu),d;c.source_a.kind=(uint8_t)PNP_SRC_TYPE;c.source_b.kind=(uint8_t)PNP_SRC_STATE_WORD;c.source_b.index=(uint8_t)(PNP_STATE_WORD_COUNT-1u);c.compare_source.kind=(uint8_t)PNP_SRC_EVENT_FIELD;c.compare_source.index=(uint8_t)(PNP_EVENT_FIELD_COUNT-1u);c.alu_op=(uint8_t)PNP_ALU_XOR;c.predicate=(uint8_t)PNP_PRED_BIT_SET;c.predicate_bit=63u;c.update_mode=(uint8_t)PNP_UPDATE_CONSTANT;c.update_index=(uint8_t)(PNP_STATE_WORD_COUNT-1u);c.update_constant=UINT64_MAX;c.event_update_destination=(uint8_t)PNP_EVENT_DEST_EPOCH;c.event_update_source=(uint8_t)PNP_EVENT_VALUE_CONSTANT;c.event_update_constant=UINT64_MAX;uint8_t a[PNP_CONFIG_WIRE_SIZE],b[PNP_CONFIG_WIRE_SIZE+1u];CHECK(pnp_config_encode_v0(&c,a,sizeof(a))==PNP_OK);CHECK(pnp_config_encode_v0(&c,b,sizeof(b))==PNP_OK&&memcmp(a,b,PNP_CONFIG_WIRE_SIZE)==0);CHECK(pnp_config_decode_v0(a,sizeof(a),&d)==PNP_OK);memset(b,0,sizeof(b));CHECK(pnp_config_encode_v0(&d,b,PNP_CONFIG_WIRE_SIZE)==PNP_OK&&memcmp(a,b,PNP_CONFIG_WIRE_SIZE)==0);for(size_t n=0u;n<PNP_CONFIG_WIRE_SIZE;++n)CHECK(pnp_config_decode_v0(a,n,&d)==PNP_ERR_BAD_FORMAT);CHECK(pnp_config_decode_v0(a,PNP_CONFIG_WIRE_SIZE+1u,&d)==PNP_ERR_BAD_FORMAT);memcpy(b,a,PNP_CONFIG_WIRE_SIZE);b[4]=1u;CHECK(pnp_config_decode_v0(b,PNP_CONFIG_WIRE_SIZE,&d)==PNP_ERR_BAD_FORMAT);memcpy(b,a,PNP_CONFIG_WIRE_SIZE);b[68u]=UINT8_MAX;CHECK(pnp_config_decode_v0(b,PNP_CONFIG_WIRE_SIZE,&d)==PNP_ERR_BAD_FORMAT);return 0;}
+
+int main(void){CHECK(exhaustive_sources()==0);CHECK(exhaustive_alu_and_predicates()==0);CHECK(exhaustive_updates_and_masks()==0);CHECK(exhaustive_event_updates()==0);CHECK(validation_torture()==0);CHECK(d1_and_differential()==0);CHECK(queue_stress()==0);CHECK(topology_and_budgets()==0);CHECK(serialization_torture()==0);return 0;}

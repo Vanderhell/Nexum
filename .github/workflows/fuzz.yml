@@ -1,0 +1,23 @@
+name: Bounded fuzzing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure libFuzzer target
+        run: cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DPNP_BUILD_FUZZ=ON
+      - name: Build
+        run: cmake --build build-fuzz --parallel
+      - name: Bounded fuzz run
+        run: ./build-fuzz/pnp_fuzz -runs=100000 -max_total_time=120

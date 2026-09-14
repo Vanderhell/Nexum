@@ -1,2 +1,19 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Keep repository text deterministic across supported platforms.
+* text=auto eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.bat text eol=crlf
+
+# Never apply text conversion to generated/binary formats if encountered.
+*.a binary
+*.lib binary
+*.dll binary
+*.exe binary
+*.o binary
+*.obj binary
+*.pdb binary

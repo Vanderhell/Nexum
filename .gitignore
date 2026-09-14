@@ -40,3 +40,31 @@ rules.ninja
 x64/
 Debug/
 Release/
+
+# Sanitizer, fuzzing, coverage, and benchmark runtime output
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+*.lcov
+coverage/
+corpus/
+artifacts/
+benchmark-results/
+
+# Temporary and editor metadata
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.vs/

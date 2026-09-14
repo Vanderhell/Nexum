@@ -1,0 +1,42 @@
+# Out-of-source CMake build trees
+/build*/
+/cmake-build-*/
+
+# CMake and CTest generated files
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+Testing/
+Makefile
+install_manifest.txt
+compile_commands.json
+
+# Ninja generated files
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+# Compiler, linker, and IDE outputs
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.tlog
+*.recipe
+*.lastbuildstate
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.dir/
+x64/
+Debug/
+Release/

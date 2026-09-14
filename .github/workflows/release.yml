@@ -41,7 +41,7 @@ jobs:
           cp README.md LICENSE CHANGELOG.md package/
           cp docs/*.md package/docs/
           find build -type f \( -name 'libpnp.a' -o -name 'pnp.lib' \) -exec cp {} package/lib/ \;
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: package

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security reporting
+    url: https://github.com/Vanderhell/Nexum/security/advisories/new
+    about: Do not disclose vulnerabilities publicly. Read SECURITY.md and use private vulnerability reporting when enabled.

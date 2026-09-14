@@ -1,0 +1,92 @@
+# Nexum architecture
+
+Nexum separates logical program construction from the frozen execution core:
+
+```text
+Declarative frontend (future work)
+              |
+              v
+Compiler helpers / Program Builder
+              |
+              v
+       Nexum Program IR
+              |
+              v
+    deterministic lowering
+              |
+              v
+    frozen PNP graph runtime
+              |
+              v
+      primitive execution
+```
+
+The declarative frontend is not implemented. Current compiler helpers are bounded
+convenience compositions, not a text language or interpreter.
+
+## Primitive and event
+
+A primitive computes one fixed transition from an immutable `pnp_config_t`, one
+`pnp_state_t`, and one `pnp_event_t`. Existing selectors feed a single ALU operation
+and predicate. A successful predicate may update one state word, update one event
+field, and select one bounded output mask. No new opcodes are introduced above this
+layer.
+
+Events have fixed-width TYPE, input port, sequence, epoch, flags, payload descriptor,
+and metadata fields. The core does not dereference payload memory. Time and random
+values must arrive as explicit events.
+
+## State domains and graphs
+
+A graph cell references a state domain. Sharing is explicit: cells that name the
+same domain observe the same state; isolated domains do not alias. Directed edges
+connect cell output ports to cell input ports or to external outputs.
+
+The runtime processes a caller-owned FIFO. Edges are traversed in array order, so
+ordering is semantic. Queue, external-output, step, and emitted-event limits are
+explicit and failures are reported rather than clamped.
+
+## Program IR and lowering
+
+`nexum_program_t` is a bounded logical representation with embedded cells, domains,
+edges, inputs, and outputs. It does not depend on runtime array addresses or queue
+storage. Validation checks IDs, references, capacities, ports, routing order, and
+every embedded primitive configuration.
+
+Lowering sorts cells and domains by logical ID and routes by source, port, and
+explicit route order. The caller provides node, edge, and state-domain arrays.
+Lowering performs no heap allocation and reuses the frozen `pnp_graph_t` backend.
+
+## Builder and compiler helpers
+
+The Program Builder fills IR without manual array indexes, IDs, or route-order
+accounting. It uses explicit capacities, latches the first error, and becomes
+immutable after finalization. Configuration helpers construct ordinary validated
+`pnp_config_t` values.
+
+Compiler helpers currently cover pass, conditional drop/route, metadata or TYPE
+rewrite, counter, ACK generation, and the demonstrated retry composition. They are
+syntactic sugar over the builder and frozen primitive semantics.
+
+## Determinism
+
+```text
+D1  Same primitive configuration/state/event -> same result.
+D2  Same ordered graph input stream -> same ordered output stream.
+D3  Schedule independence; conservatively proven only for eligible graphs.
+```
+
+D1 and D2 are required properties. D3 is reported as `PROVEN` or `NOT_PROVEN`; the
+latter is not automatically a runtime error.
+
+## Bounded memory and execution
+
+Production execution uses caller-owned fixed-capacity storage. Primitive fan-out is
+bounded, graph queues are bounded, and graph runs require step and emission budgets.
+The graph may contain cycles, but exhaustion of a budget terminates with an error.
+
+## Serialization
+
+Canonical v0 serialization exists for `pnp_config_t` and `pnp_state_t` using an
+explicit little-endian format. Stable Program IR or graph-program serialization is
+not implemented and no hash ABI is defined.

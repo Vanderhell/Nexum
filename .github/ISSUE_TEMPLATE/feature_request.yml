@@ -1,0 +1,29 @@
+name: Feature or architecture proposal
+description: Propose a capability with its architectural costs
+title: "[Proposal]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: {label: Problem statement, description: Describe the problem without prescribing a runtime opcode.}
+    validations: {required: true}
+  - type: textarea
+    id: use_case
+    attributes: {label: Use case, description: Include representative events, state, and expected outputs.}
+    validations: {required: true}
+  - type: textarea
+    id: composition
+    attributes: {label: Why existing composition is insufficient, description: Explain attempts using existing cells, IR, and builder/compiler APIs.}
+    validations: {required: true}
+  - type: textarea
+    id: architecture
+    attributes: {label: Architectural impact, description: Identify frozen contracts or public APIs affected.}
+    validations: {required: true}
+  - type: textarea
+    id: determinism
+    attributes: {label: Determinism impact, description: Discuss D1, D2, ordering, and any D3 implications.}
+    validations: {required: true}
+  - type: textarea
+    id: boundedness
+    attributes: {label: Boundedness impact, description: Describe memory, queue, output, and execution bounds.}
+    validations: {required: true}

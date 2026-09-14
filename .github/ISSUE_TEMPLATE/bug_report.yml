@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible defect in Nexum
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please do not disclose security vulnerabilities here. Follow SECURITY.md.
+  - type: input
+    id: version
+    attributes: {label: Nexum commit/version, placeholder: Commit SHA or tag}
+    validations: {required: true}
+  - type: input
+    id: platform
+    attributes: {label: Platform, placeholder: OS and architecture}
+    validations: {required: true}
+  - type: input
+    id: compiler
+    attributes: {label: Compiler, placeholder: Compiler name and version}
+    validations: {required: true}
+  - type: dropdown
+    id: build_type
+    attributes: {label: Build type, options: [Debug, Release, Other]}
+    validations: {required: true}
+  - type: textarea
+    id: reproduction
+    attributes: {label: Reproduction, description: Provide the smallest deterministic reproducer.}
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Expected behavior}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: Actual behavior}
+    validations: {required: true}
+  - type: textarea
+    id: logs
+    attributes: {label: Relevant test or log output, render: shell}
+    validations: {required: true}

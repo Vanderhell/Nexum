@@ -19,7 +19,7 @@ jobs:
             artifact: nexum-windows
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: {ref: "${{ github.ref }}"}
       - name: Validate version tag and release inputs
         shell: bash

@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure libFuzzer target
         run: cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DPNP_BUILD_FUZZ=ON
       - name: Build

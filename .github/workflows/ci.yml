@@ -17,7 +17,7 @@ jobs:
         build_type: [Debug, Release]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=${{ matrix.compiler }}
       - name: Build
@@ -32,7 +32,7 @@ jobs:
         build_type: [Debug, Release]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -A x64
       - name: Build

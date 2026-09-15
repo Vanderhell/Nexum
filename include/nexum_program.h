@@ -92,10 +92,19 @@ typedef struct nexum_runtime_storage {
     uint32_t state_domain_capacity;
 } nexum_runtime_storage_t;
 
+typedef enum nexum_bound_status { NEXUM_BOUND_NOT_PROVEN=0, NEXUM_BOUND_CONSERVATIVE=1, NEXUM_BOUND_PROVEN=2 } nexum_bound_status_t;
+typedef struct nexum_resource_plan {
+    uint32_t runtime_nodes,state_domains,routes,routing_index_entries,input_mapping_entries,output_mapping_entries;
+    uint32_t maximum_fanout,scratch_words,queue_bound;uint64_t emission_bound;
+    uint8_t queue_status,emission_status;uint16_t reserved;
+    size_t graph_storage_bytes;
+} nexum_resource_plan_t;
+
 pnp_result_t nexum_program_validate(const nexum_program_t *program);
 pnp_result_t nexum_program_finalize(nexum_program_t *program);
 pnp_result_t nexum_program_requirements(const nexum_program_t *program,
                                         nexum_program_requirements_t *requirements);
+pnp_result_t nexum_program_plan(const nexum_program_t *program,nexum_resource_plan_t *plan);
 pnp_result_t nexum_program_lower(const nexum_program_t *program,
                                  const nexum_runtime_storage_t *storage,
                                  pnp_graph_t *graph);

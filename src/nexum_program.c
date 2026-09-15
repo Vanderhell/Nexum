@@ -112,6 +112,22 @@ pnp_result_t nexum_program_requirements(const nexum_program_t *p,
     return PNP_OK;
 }
 
+pnp_result_t nexum_program_plan(const nexum_program_t *p,nexum_resource_plan_t *plan){
+    uint32_t i,j,k,max=0u;int cyclic=0;uint8_t reach[PNP_GRAPH_MAX_NODES][PNP_GRAPH_MAX_NODES];pnp_result_t r;nexum_program_requirements_t req;
+    if(plan==NULL)return PNP_ERR_INVALID_ARGUMENT;r=nexum_program_requirements(p,&req);if(r!=PNP_OK)return r;memset(plan,0,sizeof(*plan));
+    plan->runtime_nodes=req.node_count;plan->state_domains=req.state_domain_count;plan->routes=req.edge_count;
+    plan->routing_index_entries=req.edge_count+PNP_GRAPH_ROUTE_SLOT_COUNT;plan->input_mapping_entries=p->input_count;plan->output_mapping_entries=p->output_count;plan->scratch_words=PNP_EVENT_SCRATCH_WORD_COUNT;
+    plan->graph_storage_bytes=req.runtime_storage_bytes+sizeof(pnp_graph_t);
+    for(i=0u;i<p->cell_count;++i)for(j=0u;j<PNP_MAX_OUTPUTS;++j){uint32_t n=0u;for(k=0u;k<p->edge_count;++k)if(p->edges[k].source_cell_id==p->cells[i].id&&p->edges[k].source_port==j)++n;for(k=0u;k<p->output_count;++k)if(p->outputs[k].source_cell_id==p->cells[i].id&&p->outputs[k].source_port==j)++n;if(n>max)max=n;}
+    plan->maximum_fanout=max;
+    /* Any directed cycle makes a complete queue/emission bound unproven. */
+    memset(reach,0,sizeof(reach));for(i=0u;i<p->edge_count;++i)reach[runtime_cell_index(p,p->edges[i].source_cell_id)][runtime_cell_index(p,p->edges[i].destination_cell_id)]=1u;
+    for(k=0u;k<p->cell_count;++k)for(i=0u;i<p->cell_count;++i)for(j=0u;j<p->cell_count;++j)if(reach[i][k]&&reach[k][j])reach[i][j]=1u;
+    for(i=0u;i<p->cell_count;++i)if(reach[i][i])cyclic=1;
+    if(!cyclic){plan->queue_bound=req.edge_count+1u;plan->emission_bound=req.edge_count;plan->queue_status=(uint8_t)NEXUM_BOUND_CONSERVATIVE;plan->emission_status=(uint8_t)NEXUM_BOUND_CONSERVATIVE;}
+    return PNP_OK;
+}
+
 static int route_less(const nexum_program_t *p, uint32_t a, uint32_t b) {
     uint32_t as, ap, ao, ad, ai, bs, bp, bo, bd, bi;
     if (a < p->edge_count) {

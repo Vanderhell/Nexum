@@ -9,7 +9,8 @@
 #define NEXUM_PROGRAM_MAX_STATE_DOMAINS PNP_GRAPH_MAX_NODES
 #define NEXUM_PROGRAM_MAX_EDGES 2048u
 #define NEXUM_PROGRAM_MAX_INPUTS PNP_GRAPH_INPUT_PORT_COUNT
-#define NEXUM_PROGRAM_MAX_OUTPUTS 2048u
+/* Boundary ports are uint32_t but the frozen graph namespace is 0..255. */
+#define NEXUM_PROGRAM_MAX_OUTPUTS PNP_GRAPH_INPUT_PORT_COUNT
 #define NEXUM_PROGRAM_FINALIZED UINT32_C(0x4e585031)
 
 typedef struct nexum_cell {
@@ -42,7 +43,7 @@ typedef struct nexum_input {
 } nexum_input_t;
 
 typedef struct nexum_output {
-    uint32_t id; /* Unique logical output ID; becomes the runtime boundary port. */
+    uint32_t id; /* Unique logical output ID in [0,NEXUM_PROGRAM_MAX_OUTPUTS). */
     uint32_t source_cell_id;
     uint32_t source_port;
     uint32_t route_order;

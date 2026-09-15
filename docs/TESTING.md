@@ -18,7 +18,10 @@ The suites cover primitive validation and boundaries, graph queues and topology,
 FIFO order, D1/D2 replay, conservative D3 analysis, expressivity compositions,
 FSM and retry paths, generated/property-style cases, canonical v0 serialization,
 cross-toolchain result vectors, the architecture freeze, Program IR, builder, and
-compiler helpers.
+compiler helpers. The v1.1 hardening suite also characterizes deterministic route
+ordering, logical-output boundaries, injection validation, partial commits, and
+the restored definition-only `pnp_graph_t` layout. The complete suite contains 17
+CTest executables.
 
 ## Sanitizers
 

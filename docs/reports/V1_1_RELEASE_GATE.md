@@ -1,8 +1,8 @@
 # Nexum v1.1.0 release gate
 
-Status: **PASS — v1.1.0 is ready to tag**
+Status: **FAIL — do not tag v1.1.0**
 
-Release-candidate implementation base: `8f22c4c5ccb54ed27d5da3823840833102695ec0`, plus the release-blocker fixes and metadata recorded by this report's commit.
+Audited release-candidate commit before this documentation audit: `db55f54dad2e1091a279056441bf8108982f52f2`.
 
 ## Complete supported matrix
 
@@ -34,7 +34,12 @@ Graph failures have documented deterministic partial-commit semantics. Logical o
 ## Remaining issues
 
 - P0: none.
-- P1: none.
+- P1: `nexum_program_plan()` labels `emission_bound = edge_count` conservative
+  for every acyclic graph. A reconvergent DAG can process downstream nodes more
+  than once and emit more events than its route count, so this is an unsafe
+  underestimate. Correct the analysis or report the bound as not proven, and add
+  a reconvergent regression test before tagging.
 - P2: a generic declarative compiler still needs primitive-level scratch read/write operations. The explicit sequence-correlated single-slot RETRY helper is supported; no general reliability-language claim is made.
 
-Project metadata is set to `1.1.0`. Release notes are prepared. No Git tag or GitHub release was created.
+Project metadata remains set to `1.1.0` and draft release notes are prepared, but
+the P1 planner issue blocks tagging. No Git tag or GitHub release was created.

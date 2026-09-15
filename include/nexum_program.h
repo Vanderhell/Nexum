@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "pnp_graph.h"
 
-/* v0.2 IR implementation bounds. These are source-level limits, not a wire ABI. */
+/* v1.1 IR implementation bounds. These are source-level limits, not a wire ABI. */
 #define NEXUM_PROGRAM_MAX_CELLS PNP_GRAPH_MAX_NODES
 #define NEXUM_PROGRAM_MAX_STATE_DOMAINS PNP_GRAPH_MAX_NODES
 #define NEXUM_PROGRAM_MAX_EDGES 2048u

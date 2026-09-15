@@ -56,6 +56,14 @@ every embedded primitive configuration.
 Lowering sorts cells and domains by logical ID and routes by source, port, and
 explicit route order. The caller provides node, edge, and state-domain arrays.
 Lowering performs no heap allocation and reuses the frozen `pnp_graph_t` backend.
+Finalization sorts the bounded logical-input table, allowing normal injection to
+use binary lookup without revalidating the complete Program IR. Callers must not
+mutate a finalized program without finalizing it again.
+
+Before each graph run, the runtime derives a bounded routing index in automatic
+storage. The index is not part of `pnp_graph_t` and preserves edge-array order.
+Event processing follows only the indexed routes for the emitted node and port;
+it does not scan unrelated edges.
 
 ## Graph failure contract
 
@@ -77,8 +85,10 @@ immutable after finalization. Configuration helpers construct ordinary validated
 `pnp_config_t` values.
 
 Compiler helpers currently cover pass, conditional drop/route, metadata or TYPE
-rewrite, counter, ACK generation, and the demonstrated retry composition. They are
-syntactic sugar over the builder and frozen primitive semantics.
+rewrite, counter, ACK generation, and a single-slot retry composition. RETRY stores
+one pending sequence, accepts only a sequence-correlated ACK, and produces one
+terminal failure for the slot. These helpers are syntactic sugar over the builder
+and frozen primitive semantics, not a general declarative compiler.
 
 ## Determinism
 
@@ -97,8 +107,6 @@ Production execution uses caller-owned fixed-capacity storage. Primitive fan-out
 bounded, graph queues are bounded, and graph runs require step and emission budgets.
 The graph may contain cycles, but exhaustion of a budget terminates with an error.
 
-## Serialization
-
 ## Event-local scratch
 
 Each internal queue envelope owns four 64-bit scratch words and an explicit
@@ -107,6 +115,20 @@ the envelope by value, including at fan-out, so branches never alias mutable
 scratch. Scratch ends with the envelope, is not exposed as external payload or
 serialized, and replay remains byte-deterministic. Out-of-range access returns
 an explicit capacity error.
+
+`pnp_graph_event_t` grew to contain this envelope. Consumers providing queue
+storage must rebuild against the v1.1 headers. The derived routing index does not
+change the layout of `pnp_graph_t`.
+
+## Resource planning
+
+`nexum_program_plan()` deterministically reports structural counts, routing and
+mapping entries, maximum per-port fan-out, scratch words, and storage size. Bound
+statuses distinguish proven, conservative, and unproven results. The v1.1 pre-tag
+audit found that the current acyclic emission calculation does not account for
+reconvergent path multiplicity; its conservative status must not be relied upon
+until that release blocker is corrected. Cycles are explicitly reported as
+`NEXUM_BOUND_NOT_PROVEN`.
 
 ## Serialization
 

@@ -126,9 +126,10 @@ reports. Follow [`SECURITY.md`](SECURITY.md) and read the technical
 ## Roadmap and contributions
 
 Current and exploratory work are separated in [`docs/ROADMAP.md`](docs/ROADMAP.md).
-The next research question is safe event-local scratch for a future general
-declarative compiler. Optimizers, serialization formats, tracing, embedded targets,
-SIMD, and hardware backends are later research—not committed APIs.
+Bounded event-local scratch now exists in internal queue envelopes, but primitives
+cannot yet read or write it. A genuinely general declarative compiler therefore
+remains research work. Optimizers, serialization formats, tracing, embedded
+targets, SIMD, and hardware backends are later research—not committed APIs.
 
 Contributions are welcome under [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).

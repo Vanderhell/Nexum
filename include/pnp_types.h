@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Preliminary v0.1 implementation limits; these are not a stable ABI. */
+/* Experimental implementation limits; these are not a stable ABI. */
 #define PNP_EVENT_FIELD_COUNT 8u
 #define PNP_STATE_WORD_COUNT 8u
 #define PNP_MAX_OUTPUTS 8u

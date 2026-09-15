@@ -94,11 +94,26 @@ typedef struct nexum_runtime_storage {
 
 typedef enum nexum_bound_status { NEXUM_BOUND_NOT_PROVEN=0, NEXUM_BOUND_CONSERVATIVE=1, NEXUM_BOUND_PROVEN=2 } nexum_bound_status_t;
 typedef struct nexum_resource_plan {
+    /* Exact structural counts; index entries include per-route links and slots. */
     uint32_t runtime_nodes,state_domains,routes,routing_index_entries,input_mapping_entries,output_mapping_entries;
-    uint32_t maximum_fanout,scratch_words,queue_bound;uint64_t emission_bound;
-    uint8_t queue_status,emission_status;uint16_t reserved;
-    size_t graph_storage_bytes;
+    /* Temporary index-construction entries and maximum routes from one node outcome. */
+    uint32_t routing_work_entries,maximum_fanout,scratch_words,queue_bound;
+    /* Per-root-event dynamic bounds, interpreted according to their statuses. */
+    uint64_t emission_bound,step_bound;
+    uint8_t queue_status,emission_status,step_status,reserved;
+    /* Structural runtime graph bytes and bounded routing-index automatic storage. */
+    size_t graph_storage_bytes,routing_index_storage_bytes,routing_work_storage_bytes;
 } nexum_resource_plan_t;
+
+/*
+ * Bounds apply to the maximum work caused by one event injected at any valid
+ * logical program input, with sufficient runtime queue/output capacity. One
+ * emission is exactly one successful internal queue push or external-output
+ * append performed for a primitive output route; root injection and unrouted
+ * primitive outputs are not emissions. DAG bounds use mutually exclusive
+ * predicate outcomes conservatively. Cycles and arithmetic overflow produce
+ * NEXUM_BOUND_NOT_PROVEN and a zero value for the affected bound.
+ */
 
 pnp_result_t nexum_program_validate(const nexum_program_t *program);
 pnp_result_t nexum_program_finalize(nexum_program_t *program);

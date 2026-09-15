@@ -38,6 +38,8 @@ pnp_result_t nexum_program_validate(const nexum_program_t *p) {
         p->state_domain_count > NEXUM_PROGRAM_MAX_STATE_DOMAINS ||
         p->edge_count > NEXUM_PROGRAM_MAX_EDGES || p->input_count > NEXUM_PROGRAM_MAX_INPUTS ||
         p->output_count > NEXUM_PROGRAM_MAX_OUTPUTS) return PNP_ERR_INVALID_GRAPH;
+    if (p->output_count > PNP_GRAPH_MAX_EDGES ||
+        p->edge_count > PNP_GRAPH_MAX_EDGES - p->output_count) return PNP_ERR_INVALID_GRAPH;
     if ((p->reserved[0] != 0u && p->reserved[0] != NEXUM_PROGRAM_FINALIZED) ||
         p->reserved[1] != 0u || p->reserved[2] != 0u) return PNP_ERR_INVALID_GRAPH;
     for (i = 0u; i < p->state_domain_count; ++i) {
@@ -112,22 +114,106 @@ pnp_result_t nexum_program_requirements(const nexum_program_t *p,
     return PNP_OK;
 }
 
+typedef struct planner_cost {
+    uint64_t emissions;
+    uint64_t internal_emissions;
+    uint64_t downstream_steps;
+    uint32_t direct_fanout;
+    uint8_t overflow;
+} planner_cost_t;
+
+typedef struct planner_route {
+    uint32_t destination;
+    uint32_t next;
+    uint8_t external;
+} planner_route_t;
+
+static int checked_add_u64(uint64_t *value,uint64_t addend){
+    if(*value>UINT64_MAX-addend)return 0;
+    *value+=addend;return 1;
+}
+
+static planner_cost_t planner_branch(uint32_t node,uint32_t mask,
+                                     const uint32_t *first,const planner_route_t *routes,
+                                     const uint64_t *emissions,
+                                     const uint64_t *internal_emissions,
+                                     const uint64_t *steps,const uint8_t *overflow){
+    planner_cost_t cost={0};uint32_t port;
+    for(port=0u;port<PNP_MAX_OUTPUTS;++port)if((mask&(UINT32_C(1)<<port))!=0u){uint32_t route;
+        for(route=first[node*PNP_MAX_OUTPUTS+port];route!=UINT32_MAX;route=routes[route].next){
+            ++cost.direct_fanout;if(!checked_add_u64(&cost.emissions,UINT64_C(1)))cost.overflow=1u;
+            if(!routes[route].external){uint32_t destination=routes[route].destination;
+                if(overflow[destination]||!checked_add_u64(&cost.emissions,emissions[destination])||
+                   !checked_add_u64(&cost.internal_emissions,UINT64_C(1))||
+                   !checked_add_u64(&cost.internal_emissions,internal_emissions[destination])||
+                   !checked_add_u64(&cost.downstream_steps,steps[destination]))cost.overflow=1u;
+            }
+        }
+    }
+    return cost;
+}
+
+static uint64_t larger_u64(uint64_t a,uint64_t b){return a>b?a:b;}
+static uint32_t larger_u32(uint32_t a,uint32_t b){return a>b?a:b;}
+static uint32_t planner_cell_index(const nexum_cell_t *const *cells,uint32_t count,uint32_t id){
+    uint32_t lo=0u,hi=count;while(lo<hi){uint32_t mid=lo+(hi-lo)/2u;if(cells[mid]->id<id)lo=mid+1u;else hi=mid;}return lo;
+}
+
 pnp_result_t nexum_program_plan(const nexum_program_t *p,nexum_resource_plan_t *plan){
-    uint32_t i,j,k,max=0u;int cyclic=0;uint8_t reach[PNP_GRAPH_MAX_NODES][PNP_GRAPH_MAX_NODES];pnp_result_t r;nexum_program_requirements_t req;
+    const nexum_cell_t *cells[PNP_GRAPH_MAX_NODES];uint32_t indegree[PNP_GRAPH_MAX_NODES]={0};
+    uint32_t order[PNP_GRAPH_MAX_NODES],queue[PNP_GRAPH_MAX_NODES];
+    uint32_t first[PNP_GRAPH_ROUTE_SLOT_COUNT],last[PNP_GRAPH_ROUTE_SLOT_COUNT];
+    planner_route_t routes[PNP_GRAPH_MAX_EDGES];
+    uint64_t emissions[PNP_GRAPH_MAX_NODES]={0},internal[PNP_GRAPH_MAX_NODES]={0},steps[PNP_GRAPH_MAX_NODES]={0};
+    uint8_t overflow[PNP_GRAPH_MAX_NODES]={0};
+    uint32_t i,j,route_count=0u,head=0u,tail=0u,ordered=0u;int all_fixed=1;pnp_result_t r;nexum_program_requirements_t req;
     if(plan==NULL)return PNP_ERR_INVALID_ARGUMENT;
-    r=nexum_program_requirements(p,&req);
-    if(r!=PNP_OK)return r;
+    r=nexum_program_requirements(p,&req);if(r!=PNP_OK)return r;
     memset(plan,0,sizeof(*plan));
     plan->runtime_nodes=req.node_count;plan->state_domains=req.state_domain_count;plan->routes=req.edge_count;
-    plan->routing_index_entries=req.edge_count+PNP_GRAPH_ROUTE_SLOT_COUNT;plan->input_mapping_entries=p->input_count;plan->output_mapping_entries=p->output_count;plan->scratch_words=PNP_EVENT_SCRATCH_WORD_COUNT;
+    plan->routing_index_entries=req.edge_count+PNP_GRAPH_ROUTE_SLOT_COUNT;
+    plan->routing_work_entries=PNP_GRAPH_ROUTE_SLOT_COUNT;
+    plan->input_mapping_entries=p->input_count;plan->output_mapping_entries=p->output_count;
+    plan->scratch_words=PNP_EVENT_SCRATCH_WORD_COUNT;
     plan->graph_storage_bytes=req.runtime_storage_bytes+sizeof(pnp_graph_t);
-    for(i=0u;i<p->cell_count;++i)for(j=0u;j<PNP_MAX_OUTPUTS;++j){uint32_t n=0u;for(k=0u;k<p->edge_count;++k)if(p->edges[k].source_cell_id==p->cells[i].id&&p->edges[k].source_port==j)++n;for(k=0u;k<p->output_count;++k)if(p->outputs[k].source_cell_id==p->cells[i].id&&p->outputs[k].source_port==j)++n;if(n>max)max=n;}
-    plan->maximum_fanout=max;
-    /* Any directed cycle makes a complete queue/emission bound unproven. */
-    memset(reach,0,sizeof(reach));for(i=0u;i<p->edge_count;++i)reach[runtime_cell_index(p,p->edges[i].source_cell_id)][runtime_cell_index(p,p->edges[i].destination_cell_id)]=1u;
-    for(k=0u;k<p->cell_count;++k)for(i=0u;i<p->cell_count;++i)for(j=0u;j<p->cell_count;++j)if(reach[i][k]&&reach[k][j])reach[i][j]=1u;
-    for(i=0u;i<p->cell_count;++i)if(reach[i][i])cyclic=1;
-    if(!cyclic){plan->queue_bound=req.edge_count+1u;plan->emission_bound=req.edge_count;plan->queue_status=(uint8_t)NEXUM_BOUND_CONSERVATIVE;plan->emission_status=(uint8_t)NEXUM_BOUND_CONSERVATIVE;}
+    plan->routing_index_storage_bytes=(size_t)plan->routing_index_entries*sizeof(uint32_t);
+    plan->routing_work_storage_bytes=(size_t)plan->routing_work_entries*sizeof(uint32_t);
+    for(i=0u;i<p->cell_count;++i){uint32_t runtime=runtime_cell_index(p,p->cells[i].id);cells[runtime]=&p->cells[i];if(p->cells[i].config.predicate!=(uint8_t)PNP_PRED_ALWAYS)all_fixed=0;}
+    for(i=0u;i<PNP_GRAPH_ROUTE_SLOT_COUNT;++i){first[i]=UINT32_MAX;last[i]=UINT32_MAX;}
+    for(i=0u;i<p->edge_count;++i){uint32_t source=planner_cell_index(cells,p->cell_count,p->edges[i].source_cell_id),destination=planner_cell_index(cells,p->cell_count,p->edges[i].destination_cell_id),slot=source*PNP_MAX_OUTPUTS+p->edges[i].source_port;
+        routes[route_count]=(planner_route_t){destination,UINT32_MAX,0u};if(last[slot]==UINT32_MAX)first[slot]=route_count;else routes[last[slot]].next=route_count;last[slot]=route_count++;++indegree[destination];}
+    for(i=0u;i<p->output_count;++i){uint32_t source=planner_cell_index(cells,p->cell_count,p->outputs[i].source_cell_id),slot=source*PNP_MAX_OUTPUTS+p->outputs[i].source_port;
+        routes[route_count]=(planner_route_t){0u,UINT32_MAX,1u};if(last[slot]==UINT32_MAX)first[slot]=route_count;else routes[last[slot]].next=route_count;last[slot]=route_count++;}
+    for(i=0u;i<p->cell_count;++i)if(indegree[i]==0u)queue[tail++]=i;
+    while(head<tail){uint32_t node=queue[head++];order[ordered++]=node;
+        for(i=0u;i<PNP_MAX_OUTPUTS;++i){uint32_t route;for(route=first[node*PNP_MAX_OUTPUTS+i];route!=UINT32_MAX;route=routes[route].next)if(!routes[route].external&&--indegree[routes[route].destination]==0u)queue[tail++]=routes[route].destination;}
+    }
+    for(i=0u;i<p->cell_count;++i){const pnp_config_t *config=&cells[i]->config;
+        planner_cost_t yes=planner_branch(i,config->emit_true,first,routes,emissions,internal,steps,overflow);
+        planner_cost_t no=planner_branch(i,config->emit_false,first,routes,emissions,internal,steps,overflow);
+        uint32_t fanout=config->predicate==(uint8_t)PNP_PRED_ALWAYS?(config->predicate_invert?no.direct_fanout:yes.direct_fanout):larger_u32(yes.direct_fanout,no.direct_fanout);
+        if(fanout>plan->maximum_fanout)plan->maximum_fanout=fanout;
+    }
+    if(ordered!=p->cell_count)return PNP_OK;
+    for(i=ordered;i>0u;--i){uint32_t node=order[i-1u];const pnp_config_t *config=&cells[node]->config;
+        planner_cost_t yes=planner_branch(node,config->emit_true,first,routes,emissions,internal,steps,overflow);
+        planner_cost_t no=planner_branch(node,config->emit_false,first,routes,emissions,internal,steps,overflow);
+        planner_cost_t selected;
+        if(config->predicate==(uint8_t)PNP_PRED_ALWAYS)selected=config->predicate_invert?no:yes;
+        else{selected=yes;selected.emissions=larger_u64(yes.emissions,no.emissions);selected.internal_emissions=larger_u64(yes.internal_emissions,no.internal_emissions);selected.downstream_steps=larger_u64(yes.downstream_steps,no.downstream_steps);selected.direct_fanout=larger_u32(yes.direct_fanout,no.direct_fanout);selected.overflow=(uint8_t)(yes.overflow||no.overflow);}
+        emissions[node]=selected.emissions;internal[node]=selected.internal_emissions;
+        steps[node]=selected.downstream_steps;if(!checked_add_u64(&steps[node],UINT64_C(1)))selected.overflow=1u;
+        overflow[node]=selected.overflow;
+    }
+    for(i=0u;i<p->input_count;++i){uint32_t root=planner_cell_index(cells,p->cell_count,p->inputs[i].destination_cell_id);
+        if(overflow[root]){plan->emission_status=(uint8_t)NEXUM_BOUND_NOT_PROVEN;plan->step_status=(uint8_t)NEXUM_BOUND_NOT_PROVEN;plan->queue_status=(uint8_t)NEXUM_BOUND_NOT_PROVEN;plan->emission_bound=0u;plan->step_bound=0u;plan->queue_bound=0u;return PNP_OK;}
+        plan->emission_bound=larger_u64(plan->emission_bound,emissions[root]);plan->step_bound=larger_u64(plan->step_bound,steps[root]);
+    }
+    plan->emission_status=(uint8_t)(all_fixed?NEXUM_BOUND_PROVEN:NEXUM_BOUND_CONSERVATIVE);
+    plan->step_status=plan->emission_status;
+    if(plan->step_bound>UINT32_MAX)plan->queue_status=(uint8_t)NEXUM_BOUND_NOT_PROVEN;
+    else{plan->queue_bound=(uint32_t)plan->step_bound;plan->queue_status=(uint8_t)NEXUM_BOUND_CONSERVATIVE;}
+    for(j=0u;j<p->cell_count;++j)(void)internal[j];
     return PNP_OK;
 }
 

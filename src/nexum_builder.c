@@ -13,6 +13,25 @@ static pnp_result_t ready(nexum_builder_t *b) {
     return PNP_OK;
 }
 
+static void copy_source(pnp_source_t *destination,const pnp_source_t *source){
+    memset(destination,0,sizeof(*destination));destination->kind=source->kind;
+    destination->index=source->index;destination->reserved=source->reserved;
+    destination->immediate=source->immediate;
+}
+
+/* Member-wise copying keeps otherwise unspecified structure padding canonical. */
+static void copy_config(pnp_config_t *d,const pnp_config_t *s){
+    memset(d,0,sizeof(*d));copy_source(&d->source_a,&s->source_a);
+    copy_source(&d->source_b,&s->source_b);copy_source(&d->compare_source,&s->compare_source);
+    d->update_constant=s->update_constant;d->event_update_constant=s->event_update_constant;
+    d->emit_true=s->emit_true;d->emit_false=s->emit_false;d->alu_op=s->alu_op;
+    d->predicate=s->predicate;d->predicate_invert=s->predicate_invert;d->predicate_bit=s->predicate_bit;
+    d->update_mode=s->update_mode;d->update_index=s->update_index;d->update_event_index=s->update_event_index;
+    d->event_update_destination=s->event_update_destination;d->event_update_source=s->event_update_source;
+    d->event_update_index=s->event_update_index;d->event_update_state_index=s->event_update_state_index;
+    d->reserved=s->reserved;
+}
+
 pnp_result_t nexum_builder_init(nexum_builder_t *b, nexum_program_t *p,
                                 nexum_builder_capacities_t c) {
     if (b == NULL || p == NULL) return PNP_ERR_INVALID_ARGUMENT;
@@ -43,7 +62,7 @@ pnp_result_t nexum_builder_add_cell(nexum_builder_t *b, const pnp_config_t *conf
     if (domain >= b->program->state_domain_count) return fail(b, PNP_ERR_INVALID_CONFIG);
     if (b->program->cell_count >= b->capacities.cells) return fail(b, PNP_ERR_BUFFER_FULL);
     item = &b->program->cells[b->program->cell_count]; item->id = b->program->cell_count;
-    item->state_domain_id = domain; item->config = *config; *cell = item->id;
+    item->state_domain_id = domain; copy_config(&item->config,config); *cell = item->id;
     ++b->program->cell_count; return PNP_OK;
 }
 

@@ -124,11 +124,27 @@ change the layout of `pnp_graph_t`.
 
 `nexum_program_plan()` deterministically reports structural counts, routing and
 mapping entries, maximum per-port fan-out, scratch words, and storage size. Bound
-statuses distinguish proven, conservative, and unproven results. The v1.1 pre-tag
-audit found that the current acyclic emission calculation does not account for
-reconvergent path multiplicity; its conservative status must not be relied upon
-until that release blocker is corrected. Cycles are explicitly reported as
-`NEXUM_BOUND_NOT_PROVEN`.
+statuses distinguish proven, conservative, and unproven results. An emission is
+one successful internal queue push or external-output append for a routed
+primitive output; injection and unrouted primitive outputs are excluded. Bounds
+cover the maximum work caused by one event at any logical input, not an arbitrary
+external stream.
+
+For a DAG, reverse topological dynamic programming propagates route multiplicity
+without enumerating paths. It sums simultaneously emitted ports and fan-out, but
+takes the maximum of mutually exclusive predicate outcomes. Fixed `ALWAYS`
+predicates produce proven emission and step bounds; unknown outcomes produce safe
+conservative bounds. The queue bound conservatively uses the total step bound.
+Cycles are `NOT_PROVEN`. Checked 64-bit arithmetic prevents wraparound; overflow
+makes emission, step, and queue bounds `NOT_PROVEN`, and a queue bound larger than
+`UINT32_MAX` makes only the queue result `NOT_PROVEN`.
+
+After ordinary Program IR validation, index construction costs O(V² + R log V)
+because logical cell IDs are sparse; topological ordering and propagation cost
+O(V * P + R), where P is the fixed eight primitive output ports. The algorithm
+uses fixed bounded automatic storage and never enumerates exponentially many
+paths. Existing exhaustive validation remains the planner's overall worst-case
+cost and includes quadratic duplicate-ID/route-order checks.
 
 ## Serialization
 

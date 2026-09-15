@@ -20,8 +20,11 @@ FSM and retry paths, generated/property-style cases, canonical v0 serialization,
 cross-toolchain result vectors, the architecture freeze, Program IR, builder, and
 compiler helpers. The v1.1 hardening suite also characterizes deterministic route
 ordering, logical-output boundaries, injection validation, partial commits, and
-the restored definition-only `pnp_graph_t` layout. The complete suite contains 17
-CTest executables.
+the restored definition-only `pnp_graph_t` layout. Dedicated planner tests cover
+linear and fan-out graphs, diamond and multi-level reconvergence, layered path
+growth, multiple logical inputs, external outputs, predicate outcomes, cycles,
+checked overflow, and generated DAG/runtime comparisons. The complete suite
+contains 18 CTest executables.
 
 ## Sanitizers
 

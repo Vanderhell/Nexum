@@ -1,6 +1,6 @@
 # Nexum v1.1.0 release gate
 
-Status: **FAIL — do not tag v1.1.0**
+Status: **PASS — v1.1.0 is ready to tag after manual main push**
 
 Audited release-candidate commit before this documentation audit: `db55f54dad2e1091a279056441bf8108982f52f2`.
 
@@ -8,20 +8,25 @@ Audited release-candidate commit before this documentation audit: `db55f54dad2e1
 
 | Platform/toolchain | Configuration | Tests | Result |
 |---|---|---:|---|
-| Windows MSVC 19.42 | Debug | 17/17 | PASS |
-| Windows MSVC 19.42 | Release | 17/17 | PASS |
-| Linux GCC | Debug | 17/17 | PASS |
-| Linux GCC | Release | 17/17 | PASS |
-| Linux Clang | Debug | 17/17 | PASS |
-| Linux Clang | Release | 17/17 | PASS |
-| Linux Clang ASan | Debug | 17/17 | PASS, no findings |
-| Linux Clang UBSan | Debug | 17/17 | PASS, no findings |
+| Windows MSVC 19.42 | Debug | 18/18 | PASS |
+| Windows MSVC 19.42 | Release | 18/18 | PASS |
+| Linux GCC | Debug | 18/18 | PASS |
+| Linux GCC | Release | 18/18 | PASS |
+| Linux Clang | Debug | 18/18 | PASS |
+| Linux Clang | Release | 18/18 | PASS |
+| Linux Clang ASan | Debug | 18/18 | PASS, no findings |
+| Linux Clang UBSan | Debug | 18/18 | PASS, no findings |
 
 Linux results were run manually in WSL using clean, separate CMake build trees and the documented sanitizer flags. Windows Clang is not a declared supported release configuration.
 
 ## Correctness, performance, and memory
 
-All 136 configuration/test executions passed. Frozen primitive behavior is unchanged. Route lowering is bounded O(R²), graph emissions traverse only their indexed `(node, output port)` routes, and finalized Program IR injection uses deterministic binary lookup without whole-program validation.
+All 144 configuration/test executions passed. The planner now uses checked
+reverse-topological multiplicity propagation. Its new runtime-backed regression
+suite covers reconvergent and overflow cases. Frozen primitive behavior is
+unchanged. Route lowering remains
+bounded O(R²), graph emissions traverse only their indexed `(node, output port)`
+routes, and finalized Program IR injection uses deterministic binary lookup.
 
 The routing index is derived once per `pnp_graph_run()` before event processing and stored in bounded automatic storage. It is absent from `pnp_graph_t`, whose original definition-only layout is enforced by a compile-time regression assertion. Runtime and lowering remain heap-free. Scratch remains four 64-bit words per queue envelope and fan-out copies it by value.
 
@@ -34,12 +39,8 @@ Graph failures have documented deterministic partial-commit semantics. Logical o
 ## Remaining issues
 
 - P0: none.
-- P1: `nexum_program_plan()` labels `emission_bound = edge_count` conservative
-  for every acyclic graph. A reconvergent DAG can process downstream nodes more
-  than once and emit more events than its route count, so this is an unsafe
-  underestimate. Correct the analysis or report the bound as not proven, and add
-  a reconvergent regression test before tagging.
+- P1: none.
 - P2: a generic declarative compiler still needs primitive-level scratch read/write operations. The explicit sequence-correlated single-slot RETRY helper is supported; no general reliability-language claim is made.
 
-Project metadata remains set to `1.1.0` and draft release notes are prepared, but
-the P1 planner issue blocks tagging. No Git tag or GitHub release was created.
+Project metadata is set to `1.1.0`, release notes are prepared, and the supported
+matrix passes. No Git tag or GitHub release was created.

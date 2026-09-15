@@ -114,7 +114,10 @@ pnp_result_t nexum_program_requirements(const nexum_program_t *p,
 
 pnp_result_t nexum_program_plan(const nexum_program_t *p,nexum_resource_plan_t *plan){
     uint32_t i,j,k,max=0u;int cyclic=0;uint8_t reach[PNP_GRAPH_MAX_NODES][PNP_GRAPH_MAX_NODES];pnp_result_t r;nexum_program_requirements_t req;
-    if(plan==NULL)return PNP_ERR_INVALID_ARGUMENT;r=nexum_program_requirements(p,&req);if(r!=PNP_OK)return r;memset(plan,0,sizeof(*plan));
+    if(plan==NULL)return PNP_ERR_INVALID_ARGUMENT;
+    r=nexum_program_requirements(p,&req);
+    if(r!=PNP_OK)return r;
+    memset(plan,0,sizeof(*plan));
     plan->runtime_nodes=req.node_count;plan->state_domains=req.state_domain_count;plan->routes=req.edge_count;
     plan->routing_index_entries=req.edge_count+PNP_GRAPH_ROUTE_SLOT_COUNT;plan->input_mapping_entries=p->input_count;plan->output_mapping_entries=p->output_count;plan->scratch_words=PNP_EVENT_SCRATCH_WORD_COUNT;
     plan->graph_storage_bytes=req.runtime_storage_bytes+sizeof(pnp_graph_t);
@@ -205,8 +208,15 @@ pnp_result_t nexum_program_inject(const nexum_program_t *p, pnp_queue_t *q,
                                   uint32_t input_id, const pnp_event_t *event) {
     uint32_t lo=0u,hi,mid;
     if(p==NULL)return PNP_ERR_INVALID_ARGUMENT;
-    if(p->reserved[0]!=NEXUM_PROGRAM_FINALIZED){pnp_result_t result=nexum_program_validate(p);if(result!=PNP_OK)return result;
-        for(mid=0u;mid<p->input_count;++mid)if(p->inputs[mid].id==input_id)return pnp_graph_inject(q,runtime_cell_index(p,p->inputs[mid].destination_cell_id),p->inputs[mid].destination_port,event);return PNP_ERR_INVALID_ARGUMENT;}
+    if(p->reserved[0]!=NEXUM_PROGRAM_FINALIZED){
+        pnp_result_t result=nexum_program_validate(p);
+        if(result!=PNP_OK)return result;
+        for(mid=0u;mid<p->input_count;++mid){
+            if(p->inputs[mid].id==input_id)
+                return pnp_graph_inject(q,runtime_cell_index(p,p->inputs[mid].destination_cell_id),p->inputs[mid].destination_port,event);
+        }
+        return PNP_ERR_INVALID_ARGUMENT;
+    }
     hi=p->input_count;while(lo<hi){mid=lo+(hi-lo)/2u;if(p->inputs[mid].id<input_id)lo=mid+1u;else hi=mid;}
     if(lo<p->input_count&&p->inputs[lo].id==input_id)return pnp_graph_inject(q,runtime_cell_index(p,p->inputs[lo].destination_cell_id),p->inputs[lo].destination_port,event);
     return PNP_ERR_INVALID_ARGUMENT;

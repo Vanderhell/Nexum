@@ -2,6 +2,8 @@
 #include "test_support.h"
 #include "nexum_program.h"
 
+_Static_assert(sizeof(pnp_graph_t)==3u*sizeof(void*)+6u*sizeof(uint32_t),"pnp_graph_t contains only public graph definition");
+
 static void make_program(nexum_program_t *p) {
     memset(p,0,sizeof(*p)); p->cell_count=2u;p->state_domain_count=2u;p->edge_count=2u;p->input_count=1u;p->output_count=2u;
     p->state_domains[0].id=20u;p->state_domains[1].id=10u;

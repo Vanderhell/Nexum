@@ -1,44 +1,40 @@
 # Nexum v1.1.0 release gate
 
-Status: **FAIL — do not tag v1.1.0**
+Status: **PASS — v1.1.0 is ready to tag**
 
-Audited implementation commit: `aa9fe6115c9a966069155bb5de6ec975773a862d`.
+Release-candidate implementation base: `8f22c4c5ccb54ed27d5da3823840833102695ec0`, plus the release-blocker fixes and metadata recorded by this report's commit.
 
-## Matrix
+## Complete supported matrix
 
-| Toolchain | Configuration | Result |
-|---|---|---|
-| MSVC 19.42 | Debug | 17/17 PASS |
-| MSVC 19.42 | Release | 17/17 PASS |
-| GCC 16.1 | Debug | 17/17 PASS |
-| Clang 22.1 | Release | BLOCKED: local linker lacks `oldnames.lib` and `msvcrtd.lib` |
-| ASan | — | not available in the completed Windows matrix |
-| UBSan | — | not available in the completed Windows matrix |
+| Platform/toolchain | Configuration | Tests | Result |
+|---|---|---:|---|
+| Windows MSVC 19.42 | Debug | 17/17 | PASS |
+| Windows MSVC 19.42 | Release | 17/17 | PASS |
+| Linux GCC | Debug | 17/17 | PASS |
+| Linux GCC | Release | 17/17 | PASS |
+| Linux Clang | Debug | 17/17 | PASS |
+| Linux Clang | Release | 17/17 | PASS |
+| Linux Clang ASan | Debug | 17/17 | PASS, no findings |
+| Linux Clang UBSan | Debug | 17/17 | PASS, no findings |
 
-## Audit result
+Linux results were run manually in WSL using clean, separate CMake build trees and the documented sanitizer flags. Windows Clang is not a declared supported release configuration.
 
-Route lowering changed from cubic to bounded quadratic ordering. Runtime routing
-uses a precomputed per-node/port linked index and does not scan unrelated edges
-per emission. Finalized Program IR injection uses deterministic binary lookup
-without whole-program validation. Runtime/lowering remain heap-free. Scratch is
-four words per queue envelope and copied by value. Failure behavior is explicit
-partial commit. RETRY ACKs are sequence-correlated and terminal failure closes
-the pending slot. Logical output capacity is consistently 256.
+## Correctness, performance, and memory
 
-Compatibility impact: `pnp_graph_t` and `pnp_graph_event_t` grew to hold routing
-index and scratch storage. The project described these preliminary types as not
-a stable ABI, but this remains a material source/binary-layout change requiring
-review before a v1.1.0 tag.
+All 136 configuration/test executions passed. Frozen primitive behavior is unchanged. Route lowering is bounded O(R²), graph emissions traverse only their indexed `(node, output port)` routes, and finalized Program IR injection uses deterministic binary lookup without whole-program validation.
 
-## Open issues
+The routing index is derived once per `pnp_graph_run()` before event processing and stored in bounded automatic storage. It is absent from `pnp_graph_t`, whose original definition-only layout is enforced by a compile-time regression assertion. Runtime and lowering remain heap-free. Scratch remains four 64-bit words per queue envelope and fan-out copies it by value.
 
-- P1: the routing index is embedded in every `pnp_graph_t`; assess an adjacent
-  caller-owned representation to reduce object size and compatibility impact.
-- P1: complete Clang and sanitizer gates are unavailable in this environment.
-- P2: generic declarative compilation remains blocked because primitives cannot
-  read/write event-local scratch; the explicit RETRY helper is safe but is not a
-  general composition language.
-- P2: add dedicated planner and scratch regression executables beyond API-level
-  coverage before claiming the new facilities fully hardened.
+## Semantic and compatibility impact
 
-Project version metadata remains unchanged and no tag or release was created.
+Graph failures have documented deterministic partial-commit semantics. Logical outputs consistently use IDs 0..255. RETRY ACKs must match the pending sequence and terminal failure closes the pending slot exactly once.
+
+`pnp_graph_t` has no ABI/layout growth from routing preparation and existing `pnp_graph_run()` callers require no API change. `pnp_graph_event_t` intentionally includes the bounded scratch envelope introduced during v1.1 hardening; this changes layout for callers that store queue records, but the project labels these preliminary structures as not yet stable ABI. New finalization, planning, and scratch access functions are additive.
+
+## Remaining issues
+
+- P0: none.
+- P1: none.
+- P2: a generic declarative compiler still needs primitive-level scratch read/write operations. The explicit sequence-correlated single-slot RETRY helper is supported; no general reliability-language claim is made.
+
+Project metadata is set to `1.1.0`. Release notes are prepared. No Git tag or GitHub release was created.

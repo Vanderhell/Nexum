@@ -8,6 +8,7 @@
 #define PNP_GRAPH_MAX_NODES 256u
 #define PNP_GRAPH_MAX_EDGES 2048u
 #define PNP_GRAPH_ROUTE_SLOT_COUNT (PNP_GRAPH_MAX_NODES * PNP_MAX_OUTPUTS)
+#define PNP_EVENT_SCRATCH_WORD_COUNT 4u
 
 typedef struct pnp_node { pnp_config_t config; uint32_t state_domain; uint32_t reserved; } pnp_node_t;
 typedef struct pnp_state_domain { pnp_state_t state; } pnp_state_domain_t;
@@ -25,7 +26,7 @@ typedef struct pnp_graph {
     uint32_t route_first[PNP_GRAPH_ROUTE_SLOT_COUNT];
     uint32_t route_next[PNP_GRAPH_MAX_EDGES];
 } pnp_graph_t;
-typedef struct pnp_graph_event { uint32_t node_id; uint32_t input_port; pnp_event_t event; } pnp_graph_event_t;
+typedef struct pnp_graph_event { uint32_t node_id; uint32_t input_port; pnp_event_t event; uint32_t scratch_count; uint32_t scratch_reserved; pnp_word_t scratch[PNP_EVENT_SCRATCH_WORD_COUNT]; } pnp_graph_event_t;
 typedef struct pnp_queue { pnp_graph_event_t *items; uint32_t capacity; uint32_t head; uint32_t count; } pnp_queue_t;
 typedef struct pnp_run_limits { uint64_t max_steps; uint64_t max_emitted_events; } pnp_run_limits_t;
 typedef struct pnp_run_stats { uint64_t steps; uint64_t emitted_events; uint32_t queue_high_water; uint32_t reserved; } pnp_run_stats_t;
@@ -42,6 +43,8 @@ int pnp_queue_full(const pnp_queue_t *queue);
 uint32_t pnp_queue_count(const pnp_queue_t *queue);
 pnp_result_t pnp_queue_push(pnp_queue_t *queue, const pnp_graph_event_t *event);
 pnp_result_t pnp_queue_pop(pnp_queue_t *queue, pnp_graph_event_t *event);
+pnp_result_t pnp_graph_event_scratch_write(pnp_graph_event_t *event, uint32_t index, pnp_word_t value);
+pnp_result_t pnp_graph_event_scratch_read(const pnp_graph_event_t *event, uint32_t index, pnp_word_t *value);
 pnp_result_t pnp_graph_inject(pnp_queue_t *queue, uint32_t node_id, uint32_t input_port, const pnp_event_t *event);
 /*
  * Execution is partial-commit on error. A popped event is consumed. Its state

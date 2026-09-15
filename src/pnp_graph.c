@@ -20,6 +20,8 @@ pnp_result_t pnp_queue_pop(pnp_queue_t *q, pnp_graph_event_t *e) {
     if (q->count == 0u) return PNP_ERR_QUEUE_EMPTY;
     *e = q->items[q->head]; q->head = (q->head + 1u) % q->capacity; --q->count; return PNP_OK;
 }
+pnp_result_t pnp_graph_event_scratch_write(pnp_graph_event_t *e,uint32_t index,pnp_word_t value){if(e==NULL)return PNP_ERR_INVALID_ARGUMENT;if(index>=PNP_EVENT_SCRATCH_WORD_COUNT)return PNP_ERR_BUFFER_FULL;e->scratch[index]=value;if(e->scratch_count<=index)e->scratch_count=index+1u;return PNP_OK;}
+pnp_result_t pnp_graph_event_scratch_read(const pnp_graph_event_t *e,uint32_t index,pnp_word_t *value){if(e==NULL||value==NULL)return PNP_ERR_INVALID_ARGUMENT;if(index>=e->scratch_count||index>=PNP_EVENT_SCRATCH_WORD_COUNT)return PNP_ERR_INVALID_ARGUMENT;*value=e->scratch[index];return PNP_OK;}
 pnp_result_t pnp_graph_validate(const pnp_graph_t *g, uint32_t queue_capacity) {
     uint32_t i;
     if (g == NULL || queue_capacity == 0u) return PNP_ERR_INVALID_ARGUMENT;
@@ -72,7 +74,7 @@ pnp_result_t pnp_graph_run(pnp_graph_t *g, pnp_queue_t *q, pnp_graph_output_buff
             if (edge->source_node == current.node_id && edge->source_port == primitive_outputs.items[oi].port) {
                 if (local.emitted_events >= limits.max_emitted_events) { *stats = local; return PNP_ERR_EMIT_LIMIT; }
                 if (edge->destination_node == PNP_EXTERNAL_NODE) r = emit_external(external, current.node_id, edge->destination_port, &primitive_outputs.items[oi].event);
-                else { pnp_graph_event_t generated; memset(&generated, 0, sizeof(generated)); generated.node_id = edge->destination_node; generated.input_port = edge->destination_port; generated.event = primitive_outputs.items[oi].event; generated.event.input_port = edge->destination_port; r = pnp_queue_push(q, &generated); }
+                else { pnp_graph_event_t generated=current; generated.node_id = edge->destination_node; generated.input_port = edge->destination_port; generated.event = primitive_outputs.items[oi].event; generated.event.input_port = edge->destination_port; r = pnp_queue_push(q, &generated); }
                 if (r != PNP_OK) { *stats = local; return r; }
                 ++local.emitted_events; if (q->count > local.queue_high_water) local.queue_high_water = q->count;
             }

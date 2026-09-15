@@ -99,6 +99,17 @@ The graph may contain cycles, but exhaustion of a budget terminates with an erro
 
 ## Serialization
 
+## Event-local scratch
+
+Each internal queue envelope owns four 64-bit scratch words and an explicit
+initialized-word count. Injection zero-initializes it. Internal routing copies
+the envelope by value, including at fan-out, so branches never alias mutable
+scratch. Scratch ends with the envelope, is not exposed as external payload or
+serialized, and replay remains byte-deterministic. Out-of-range access returns
+an explicit capacity error.
+
+## Serialization
+
 Canonical v0 serialization exists for `pnp_config_t` and `pnp_state_t` using an
 explicit little-endian format. Stable Program IR or graph-program serialization is
 not implemented and no hash ABI is defined.

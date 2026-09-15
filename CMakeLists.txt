@@ -14,7 +14,7 @@ else()
 endif()
 
 enable_testing()
-foreach(test_name primitive graph topology determinism expressivity expressivity_regression fsm generated serialization analysis retry freeze cross_toolchain program builder compiler)
+foreach(test_name primitive graph topology determinism expressivity expressivity_regression fsm generated serialization analysis retry freeze cross_toolchain program builder compiler hardening_baseline)
   add_executable(test_${test_name} tests/test_${test_name}.c)
   target_link_libraries(test_${test_name} PRIVATE pnp)
   if(MSVC)

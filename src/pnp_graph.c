@@ -23,7 +23,7 @@ pnp_result_t pnp_queue_pop(pnp_queue_t *q, pnp_graph_event_t *e) {
 pnp_result_t pnp_graph_validate(const pnp_graph_t *g, uint32_t queue_capacity) {
     uint32_t i;
     if (g == NULL || queue_capacity == 0u) return PNP_ERR_INVALID_ARGUMENT;
-    if (g->node_count > g->node_capacity || g->node_count > PNP_GRAPH_MAX_NODES || g->edge_count > g->edge_capacity) return PNP_ERR_INVALID_GRAPH;
+    if (g->node_count > g->node_capacity || g->node_count > PNP_GRAPH_MAX_NODES || g->edge_count > g->edge_capacity || g->edge_count > PNP_GRAPH_MAX_EDGES) return PNP_ERR_INVALID_GRAPH;
     if (g->state_domain_count > g->state_domain_capacity) return PNP_ERR_INVALID_GRAPH;
     if ((g->node_count != 0u && g->nodes == NULL) || (g->edge_count != 0u && g->edges == NULL) || (g->state_domain_count != 0u && g->state_domains == NULL)) return PNP_ERR_INVALID_GRAPH;
     for (i = 0u; i < g->node_count; ++i) if (pnp_validate_config(&g->nodes[i].config) != PNP_OK || g->nodes[i].state_domain >= g->state_domain_count || g->nodes[i].reserved != 0u) return PNP_ERR_INVALID_GRAPH;
@@ -49,9 +49,11 @@ static pnp_result_t emit_external(pnp_graph_output_buffer_t *out, uint32_t node,
 }
 pnp_result_t pnp_graph_run(pnp_graph_t *g, pnp_queue_t *q, pnp_graph_output_buffer_t *external, pnp_run_limits_t limits, pnp_run_stats_t *stats) {
     pnp_run_stats_t local = {0}; pnp_graph_event_t current; pnp_output_buffer_t primitive_outputs; pnp_state_t next_state;
-    pnp_result_t r; uint32_t oi, ei;
+    pnp_result_t r; uint32_t oi, ei, last[PNP_GRAPH_ROUTE_SLOT_COUNT];
     if (g == NULL || q == NULL || stats == NULL || (external != NULL && external->count > external->capacity)) return PNP_ERR_INVALID_ARGUMENT;
     r = pnp_graph_validate(g, q->capacity); if (r != PNP_OK) return r;
+    for (ei=0u;ei<PNP_GRAPH_ROUTE_SLOT_COUNT;++ei){g->route_first[ei]=UINT32_MAX;last[ei]=UINT32_MAX;}
+    for (ei=0u;ei<g->edge_count;++ei){uint32_t slot=g->edges[ei].source_node*PNP_MAX_OUTPUTS+g->edges[ei].source_port;g->route_next[ei]=UINT32_MAX;if(last[slot]==UINT32_MAX)g->route_first[slot]=ei;else g->route_next[last[slot]]=ei;last[slot]=ei;}
     local.queue_high_water = q->count;
     while (!pnp_queue_empty(q)) {
         if (local.steps >= limits.max_steps) { *stats = local; return PNP_ERR_STEP_LIMIT; }
@@ -65,7 +67,7 @@ pnp_result_t pnp_graph_run(pnp_graph_t *g, pnp_queue_t *q, pnp_graph_output_buff
         }
         if (r != PNP_OK) { *stats = local; return r; }
         ++local.steps;
-        for (oi = 0u; oi < primitive_outputs.count; ++oi) for (ei = 0u; ei < g->edge_count; ++ei) {
+        for (oi = 0u; oi < primitive_outputs.count; ++oi) for (ei = g->route_first[current.node_id*PNP_MAX_OUTPUTS+primitive_outputs.items[oi].port]; ei != UINT32_MAX; ei = g->route_next[ei]) {
             const pnp_edge_t *edge = &g->edges[ei];
             if (edge->source_node == current.node_id && edge->source_port == primitive_outputs.items[oi].port) {
                 if (local.emitted_events >= limits.max_emitted_events) { *stats = local; return PNP_ERR_EMIT_LIMIT; }

@@ -6,6 +6,8 @@
 
 #define PNP_EXTERNAL_NODE UINT32_MAX
 #define PNP_GRAPH_MAX_NODES 256u
+#define PNP_GRAPH_MAX_EDGES 2048u
+#define PNP_GRAPH_ROUTE_SLOT_COUNT (PNP_GRAPH_MAX_NODES * PNP_MAX_OUTPUTS)
 
 typedef struct pnp_node { pnp_config_t config; uint32_t state_domain; uint32_t reserved; } pnp_node_t;
 typedef struct pnp_state_domain { pnp_state_t state; } pnp_state_domain_t;
@@ -19,6 +21,9 @@ typedef struct pnp_graph {
     pnp_node_t *nodes; uint32_t node_count; uint32_t node_capacity;
     pnp_edge_t *edges; uint32_t edge_count; uint32_t edge_capacity;
     pnp_state_domain_t *state_domains; uint32_t state_domain_count; uint32_t state_domain_capacity;
+    /* Rebuilt before each run; indices preserve edge-array traversal order. */
+    uint32_t route_first[PNP_GRAPH_ROUTE_SLOT_COUNT];
+    uint32_t route_next[PNP_GRAPH_MAX_EDGES];
 } pnp_graph_t;
 typedef struct pnp_graph_event { uint32_t node_id; uint32_t input_port; pnp_event_t event; } pnp_graph_event_t;
 typedef struct pnp_queue { pnp_graph_event_t *items; uint32_t capacity; uint32_t head; uint32_t count; } pnp_queue_t;

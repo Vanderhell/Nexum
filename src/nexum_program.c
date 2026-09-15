@@ -38,7 +38,8 @@ pnp_result_t nexum_program_validate(const nexum_program_t *p) {
         p->state_domain_count > NEXUM_PROGRAM_MAX_STATE_DOMAINS ||
         p->edge_count > NEXUM_PROGRAM_MAX_EDGES || p->input_count > NEXUM_PROGRAM_MAX_INPUTS ||
         p->output_count > NEXUM_PROGRAM_MAX_OUTPUTS) return PNP_ERR_INVALID_GRAPH;
-    for (i = 0u; i < 3u; ++i) if (p->reserved[i] != 0u) return PNP_ERR_INVALID_GRAPH;
+    if ((p->reserved[0] != 0u && p->reserved[0] != NEXUM_PROGRAM_FINALIZED) ||
+        p->reserved[1] != 0u || p->reserved[2] != 0u) return PNP_ERR_INVALID_GRAPH;
     for (i = 0u; i < p->state_domain_count; ++i) {
         if (p->state_domains[i].id == UINT32_MAX || p->state_domains[i].reserved != 0u)
             return PNP_ERR_INVALID_GRAPH;
@@ -82,6 +83,15 @@ pnp_result_t nexum_program_validate(const nexum_program_t *p) {
             return PNP_ERR_INVALID_GRAPH;
     }
     return PNP_OK;
+}
+
+pnp_result_t nexum_program_finalize(nexum_program_t *p) {
+    uint32_t i,j;pnp_result_t r;
+    if(p==NULL)return PNP_ERR_INVALID_ARGUMENT;
+    if(p->reserved[0]==NEXUM_PROGRAM_FINALIZED)p->reserved[0]=0u;
+    r=nexum_program_validate(p);if(r!=PNP_OK)return r;
+    for(i=1u;i<p->input_count;++i){nexum_input_t item=p->inputs[i];j=i;while(j>0u&&p->inputs[j-1u].id>item.id){p->inputs[j]=p->inputs[j-1u];--j;}p->inputs[j]=item;}
+    p->reserved[0]=NEXUM_PROGRAM_FINALIZED;return PNP_OK;
 }
 
 pnp_result_t nexum_program_requirements(const nexum_program_t *p,
@@ -177,11 +187,11 @@ pnp_result_t nexum_program_lower(const nexum_program_t *p,
 
 pnp_result_t nexum_program_inject(const nexum_program_t *p, pnp_queue_t *q,
                                   uint32_t input_id, const pnp_event_t *event) {
-    uint32_t i;
-    pnp_result_t result = nexum_program_validate(p);
-    if (result != PNP_OK) return result;
-    for (i = 0u; i < p->input_count; ++i) if (p->inputs[i].id == input_id)
-        return pnp_graph_inject(q, runtime_cell_index(p, p->inputs[i].destination_cell_id),
-                                p->inputs[i].destination_port, event);
+    uint32_t lo=0u,hi,mid;
+    if(p==NULL)return PNP_ERR_INVALID_ARGUMENT;
+    if(p->reserved[0]!=NEXUM_PROGRAM_FINALIZED){pnp_result_t result=nexum_program_validate(p);if(result!=PNP_OK)return result;
+        for(mid=0u;mid<p->input_count;++mid)if(p->inputs[mid].id==input_id)return pnp_graph_inject(q,runtime_cell_index(p,p->inputs[mid].destination_cell_id),p->inputs[mid].destination_port,event);return PNP_ERR_INVALID_ARGUMENT;}
+    hi=p->input_count;while(lo<hi){mid=lo+(hi-lo)/2u;if(p->inputs[mid].id<input_id)lo=mid+1u;else hi=mid;}
+    if(lo<p->input_count&&p->inputs[lo].id==input_id)return pnp_graph_inject(q,runtime_cell_index(p,p->inputs[lo].destination_cell_id),p->inputs[lo].destination_port,event);
     return PNP_ERR_INVALID_ARGUMENT;
 }

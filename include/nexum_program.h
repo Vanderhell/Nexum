@@ -10,6 +10,7 @@
 #define NEXUM_PROGRAM_MAX_EDGES 2048u
 #define NEXUM_PROGRAM_MAX_INPUTS PNP_GRAPH_INPUT_PORT_COUNT
 #define NEXUM_PROGRAM_MAX_OUTPUTS 2048u
+#define NEXUM_PROGRAM_FINALIZED UINT32_C(0x4e585031)
 
 typedef struct nexum_cell {
     uint32_t id;
@@ -91,6 +92,7 @@ typedef struct nexum_runtime_storage {
 } nexum_runtime_storage_t;
 
 pnp_result_t nexum_program_validate(const nexum_program_t *program);
+pnp_result_t nexum_program_finalize(nexum_program_t *program);
 pnp_result_t nexum_program_requirements(const nexum_program_t *program,
                                         nexum_program_requirements_t *requirements);
 pnp_result_t nexum_program_lower(const nexum_program_t *program,

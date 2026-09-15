@@ -98,6 +98,6 @@ pnp_result_t nexum_builder_bind_output(nexum_builder_t *b, nexum_cell_ref_t sour
 pnp_result_t nexum_builder_finalize(nexum_builder_t *b) {
     pnp_result_t r = ready(b);
     if (r != PNP_OK) return r;
-    r = nexum_program_validate(b->program); if (r != PNP_OK) return fail(b, r);
+    r = nexum_program_finalize(b->program); if (r != PNP_OK) return fail(b, r);
     b->finalized = 1u; return PNP_OK;
 }

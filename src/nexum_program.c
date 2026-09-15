@@ -128,7 +128,7 @@ static int route_less(const nexum_program_t *p, uint32_t a, uint32_t b) {
 pnp_result_t nexum_program_lower(const nexum_program_t *p,
                                  const nexum_runtime_storage_t *s, pnp_graph_t *g) {
     nexum_program_requirements_t r;
-    uint32_t i, j, route_count;
+    uint32_t i, j, route_count, previous_route = UINT32_MAX;
     pnp_result_t result;
     if (s == NULL || g == NULL) return PNP_ERR_INVALID_ARGUMENT;
     result = nexum_program_requirements(p, &r);
@@ -154,11 +154,9 @@ pnp_result_t nexum_program_lower(const nexum_program_t *p,
     route_count = r.edge_count;
     for (i = 0u; i < route_count; ++i) {
         uint32_t candidate = UINT32_MAX;
-        for (j = 0u; j < route_count; ++j) {
-            uint32_t rank = 0u, k;
-            for (k = 0u; k < route_count; ++k) if (route_less(p, k, j)) ++rank;
-            if (rank == i) { candidate = j; break; }
-        }
+        for (j = 0u; j < route_count; ++j)
+            if ((previous_route == UINT32_MAX || route_less(p, previous_route, j)) &&
+                (candidate == UINT32_MAX || route_less(p, j, candidate))) candidate = j;
         if (candidate < p->edge_count) {
             const nexum_edge_t *e = &p->edges[candidate];
             s->edges[i] = (pnp_edge_t){runtime_cell_index(p, e->source_cell_id), e->source_port,
@@ -168,6 +166,7 @@ pnp_result_t nexum_program_lower(const nexum_program_t *p,
             s->edges[i] = (pnp_edge_t){runtime_cell_index(p, out->source_cell_id), out->source_port,
                 PNP_EXTERNAL_NODE, out->id};
         }
+        previous_route = candidate;
     }
     g->nodes = s->nodes; g->node_count = r.node_count; g->node_capacity = s->node_capacity;
     g->edges = s->edges; g->edge_count = r.edge_count; g->edge_capacity = s->edge_capacity;

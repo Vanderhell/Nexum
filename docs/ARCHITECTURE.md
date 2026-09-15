@@ -57,6 +57,18 @@ Lowering sorts cells and domains by logical ID and routes by source, port, and
 explicit route order. The caller provides node, edge, and state-domain arrays.
 Lowering performs no heap allocation and reuses the frozen `pnp_graph_t` backend.
 
+## Graph failure contract
+
+Graph execution uses deterministic partial commits. Once an event is popped it
+is consumed, and its primitive state transition commits before any of its routes
+are attempted. Routes commit in edge order. Queue entries and external outputs
+created by earlier routes remain visible if a later route fails. The failing
+route itself is not committed or included in `emitted_events`; pending queue
+contents are retained. Step exhaustion is checked before popping the next event,
+while emission exhaustion is checked before attempting a route. No rollback is
+performed. Consequently callers may inspect or resume retained queued work, but
+must treat the already committed state and outputs as final.
+
 ## Builder and compiler helpers
 
 The Program Builder fills IR without manual array indexes, IDs, or route-order

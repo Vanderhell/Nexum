@@ -43,6 +43,14 @@ uint32_t pnp_queue_count(const pnp_queue_t *queue);
 pnp_result_t pnp_queue_push(pnp_queue_t *queue, const pnp_graph_event_t *event);
 pnp_result_t pnp_queue_pop(pnp_queue_t *queue, pnp_graph_event_t *event);
 pnp_result_t pnp_graph_inject(pnp_queue_t *queue, uint32_t node_id, uint32_t input_port, const pnp_event_t *event);
+/*
+ * Execution is partial-commit on error. A popped event is consumed. Its state
+ * update commits before routing. Earlier successful queue pushes and external
+ * outputs remain visible; the failing route is not counted or committed and
+ * pending queue entries remain available to a later call. A step-limit error
+ * occurs before popping the next event; an emit-limit error occurs before
+ * attempting the next route. stats describes committed work in this call.
+ */
 pnp_result_t pnp_graph_run(pnp_graph_t *graph, pnp_queue_t *queue,
                            pnp_graph_output_buffer_t *outputs, pnp_run_limits_t limits,
                            pnp_run_stats_t *stats);

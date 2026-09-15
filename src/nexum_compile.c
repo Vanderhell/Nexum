@@ -23,7 +23,7 @@ pnp_result_t nexum_compile_requirements(const nexum_compile_spec_t *s,
     memset(r, 0, sizeof(*r)); r->exact = 1u; r->capacities.state_domains = 1u;
     r->capacities.inputs = 1u;
     if (s->behavior == (uint8_t)NEXUM_BEHAVIOR_RETRY) {
-        r->capacities.cells=11u;r->capacities.edges=10u;r->capacities.outputs=3u;
+        r->capacities.cells=12u;r->capacities.edges=12u;r->capacities.outputs=3u;
     } else {
         r->capacities.cells=1u;r->capacities.edges=0u;
         r->capacities.outputs = s->behavior == (uint8_t)NEXUM_BEHAVIOR_CONDITIONAL_ROUTE ? 2u : 1u;
@@ -62,7 +62,7 @@ static pnp_result_t compile_single(const nexum_compile_spec_t *s,nexum_builder_t
 }
 
 static pnp_result_t compile_retry(const nexum_compile_spec_t *s,nexum_builder_t *b,nexum_domain_ref_t d) {
-    pnp_config_t c[11];nexum_cell_ref_t n[11];uint32_t id,i;pnp_result_t r;
+    pnp_config_t c[12];nexum_cell_ref_t n[12];uint32_t id,i;pnp_result_t r;
     c[0]=type_match(s->data_type);
     c[1]=base(1u);c[1].source_a=nexum_source_sequence();c[1].update_mode=(uint8_t)PNP_UPDATE_RESULT;c[1].update_index=0u;
     c[2]=constant_write(1u,1u,1u);c[3]=constant_write(2u,0u,1u);c[4]=type_match(s->time_type);
@@ -72,10 +72,11 @@ static pnp_result_t compile_retry(const nexum_compile_spec_t *s,nexum_builder_t 
     c[8]=type_match(s->ack_type);c[8].emit_false=0u;
     c[9]=base(1u);c[9].event_update_destination=(uint8_t)PNP_EVENT_DEST_TYPE;c[9].event_update_source=(uint8_t)PNP_EVENT_VALUE_CONSTANT;c[9].event_update_constant=s->failure_type;
     c[10]=constant_write(1u,0u,0u);
-    for(i=0u;i<11u;++i){r=nexum_builder_add_cell(b,&c[i],d,&n[i]);if(r!=PNP_OK)return r;}
+    c[11]=base(1u);c[11].source_a=nexum_source_sequence();c[11].predicate=(uint8_t)PNP_PRED_EQ;c[11].compare_source=nexum_source_state(0u);c[11].emit_false=0u;
+    for(i=0u;i<12u;++i){r=nexum_builder_add_cell(b,&c[i],d,&n[i]);if(r!=PNP_OK)return r;}
 #define CONNECT(a,p,z) do{r=nexum_builder_connect(b,n[a],p,n[z],0u);if(r!=PNP_OK)return r;}while(0)
     CONNECT(0,0u,1);CONNECT(0,1u,4);CONNECT(1,0u,2);CONNECT(2,0u,3);
-    CONNECT(4,0u,5);CONNECT(4,1u,8);CONNECT(5,0u,6);CONNECT(6,0u,7);CONNECT(7,1u,9);CONNECT(8,0u,10);
+    CONNECT(4,0u,5);CONNECT(4,1u,8);CONNECT(5,0u,6);CONNECT(6,0u,7);CONNECT(7,1u,9);CONNECT(8,0u,11);CONNECT(11,0u,10);CONNECT(9,0u,10);
 #undef CONNECT
     r=nexum_builder_bind_input(b,n[0],0u,&id);if(r!=PNP_OK)return r;
     r=nexum_builder_bind_output(b,n[3],0u,&id);if(r!=PNP_OK)return r;
